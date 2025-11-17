@@ -4,7 +4,7 @@ FastAPI backend with Gemini Vision and Firestore integration
 """
 import uuid
 from typing import Optional
-from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks
+from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks, Form
 from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
 import tempfile
 import io
@@ -239,6 +239,7 @@ async def get_risk_statistics():
 @app.post("/analyze_video", tags=["Analysis"])
 async def analyze_video(
     video: UploadFile = File(...),
+    max_seconds: Optional[float] = Form(None),
     background_tasks: BackgroundTasks = BackgroundTasks()
 ):
     """
@@ -299,6 +300,13 @@ async def analyze_video(
                 if not ret:
                     break
 
+                # compute timestamp (seconds) for this frame
+                frame_time = frame_idx / fps if fps else 0.0
+
+                # stop early if requested
+                if max_seconds is not None and frame_time > float(max_seconds):
+                    break
+
                 if frame_idx % interval_frames == 0:
                     # encode frame to JPEG bytes
                     success, encoded = cv2.imencode('.jpg', frame)
@@ -318,6 +326,7 @@ async def analyze_video(
 
                     event = {
                         'frame_index': sent_frames,
+                        'frame_time_s': round(frame_time, 3),
                         'timestamp': time.time(),
                         'filename': video.filename,
                         'analysis': adk_result

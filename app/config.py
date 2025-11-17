@@ -14,6 +14,10 @@ else:
 
 class Config:
     """Application configuration"""
+    GEMINI_VISION_MODEL = "gemini-2.5-flash"
+    GEMINI_TEXT_MODEL = "gemini-2.5-flash"
+
+
     
     # GCP Settings
     PROJECT_ID = os.getenv("GCP_PROJECT_ID", "").strip()
@@ -23,7 +27,13 @@ class Config:
     FIRESTORE_COLLECTION = os.getenv("FIRESTORE_COLLECTION", "analyses")
     
     # Model Settings
-    GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash-exp")
+    GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash-exp") #original working
+
+
+    # GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash-preview")
+    # GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash-preview-image-generation")
+    # GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+
     MAX_IMAGE_SIZE = int(os.getenv("MAX_IMAGE_SIZE", 20 * 1024 * 1024))
     ALLOWED_FORMATS = set(os.getenv("ALLOWED_FORMATS", "image/jpeg,image/png,image/webp,image/gif").split(","))
     

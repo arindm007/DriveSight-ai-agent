@@ -264,3 +264,259 @@ def get_adk_agent() -> ADKAgent:
     if _agent is None:
         _agent = ADKAgent()
     return _agent
+
+
+# """
+# ADK (Autonomous Driving Knowledge) Agent - Risk assessment and workflow orchestration
+# """
+# import json
+# from typing import Dict, Any, List, Tuple
+# from datetime import datetime
+# from google import genai   # ✅ NEW Gemini v1 SDK
+# from .config import Config
+# from .logger import setup_logger
+# import os
+# import time
+
+# # Initialize Gemini v1 client
+# GEMINI_KEY = os.getenv("GEMINI_API_KEY")
+# if not GEMINI_KEY:
+#     raise ValueError("GEMINI_API_KEY not set")
+
+# client = genai.Client(api_key=GEMINI_KEY)   # ✅ v1 API client
+
+# logger = setup_logger(__name__)
+
+# # ---------- Retry wrapper (prevents 429 failures) ----------
+# def safe_generate_content(model, contents, generation_config):
+#     for i in range(4):
+#         try:
+#             return client.models.generate_content(
+#                 model=model,
+#                 contents=contents,
+#                 generation_config=generation_config
+#             )
+#         except Exception as e:
+#             if "429" in str(e) or "rate" in str(e).lower():
+#                 wait = min(2 ** i, 10)
+#                 logger.warning(f"Rate limit hit on summary. Retrying in {wait}s...")
+#                 time.sleep(wait)
+#             else:
+#                 raise
+#     raise RuntimeError("Max retries exceeded for summary generation.")
+
+
+# class ADKAgent:
+#     """Autonomous Driving Knowledge Agent for risk assessment"""
+
+#     def __init__(self):
+#         logger.info("ADK Agent initialized using Gemini v1 API")
+
+
+#     # ------------------------------------------------------------
+#     # RISK SCORE COMPUTATION
+#     # ------------------------------------------------------------
+#     def compute_risk_score(self, detections: Dict[str, Any]) -> Tuple[float, str]:
+#         try:
+#             score = 0.0
+
+#             objects = detections.get('detected_objects', [])
+#             scene = detections.get('scene_analysis', {})
+#             visibility = detections.get('visibility_issues', [])
+#             risk_factors = detections.get('risk_factors', [])
+
+#             # Object-based scoring
+#             HIGH_RISK_OBJECTS = {'person', 'pedestrian', 'animal', 'motorcycle'}
+#             MEDIUM_RISK_OBJECTS = {'vehicle', 'bicycle', 'truck'}
+
+#             for obj in objects:
+#                 label = obj.get('label', '').lower()
+#                 conf = obj.get('confidence', 0.5)
+
+#                 if any(x in label for x in HIGH_RISK_OBJECTS):
+#                     score += min(50 * conf, 50)
+#                 elif any(x in label for x in MEDIUM_RISK_OBJECTS):
+#                     score += min(20 * conf, 20)
+
+#             # Lighting
+#             lighting = scene.get('lighting', '').lower()
+#             if 'night' in lighting:
+#                 score += 15
+#             elif 'dusk' in lighting or 'dawn' in lighting:
+#                 score += 10
+
+#             # Weather
+#             weather = scene.get('weather', '').lower()
+#             if 'rain' in weather or 'snow' in weather:
+#                 score += 20
+#             elif 'fog' in weather:
+#                 score += 15
+
+#             # Traffic
+#             traffic = scene.get('traffic_density', '').lower()
+#             if 'heavy' in traffic:
+#                 score += 15
+#             elif 'moderate' in traffic:
+#                 score += 5
+
+#             # Visibility issues
+#             if visibility and visibility != ['none']:
+#                 score += len(visibility) * 10
+
+#             # Risk factors
+#             RISK_WEIGHTS = {
+#                 'pedestrian_detected': 30,
+#                 'oncoming_traffic': 25,
+#                 'construction': 20,
+#                 'speeding_zone': 15,
+#                 'wet_road': 15,
+#                 'low_visibility': 20,
+#                 'vehicle_too_close': 25,
+#             }
+
+#             for f in risk_factors:
+#                 score += RISK_WEIGHTS.get(f, 5)
+
+#             score = min(score, 100.0)
+
+#             if score >= 70:
+#                 label = "HIGH"
+#             elif score >= 40:
+#                 label = "MODERATE"
+#             else:
+#                 label = "LOW"
+
+#             logger.info(f"Risk computed - Score: {score:.1f}, Label: {label}")
+#             return score, label
+
+#         except Exception as e:
+#             logger.error(f"Risk score computation failed: {str(e)}")
+#             return 50.0, "MODERATE"
+
+
+#     # ------------------------------------------------------------
+#     # FULL WORKFLOW
+#     # ------------------------------------------------------------
+#     def run_adk_workflow(self, detections: Dict[str, Any]) -> Dict[str, Any]:
+#         try:
+#             risk_score, risk_label = self.compute_risk_score(detections)
+
+#             summary = self._generate_summary(detections, risk_score, risk_label)
+#             summary = self._apply_guardrails(summary)
+
+#             result = {
+#                 "risk_score": round(risk_score, 2),
+#                 "risk_label": risk_label,
+#                 "summary": summary,
+#                 "detections": detections,
+#                 "timestamp": datetime.utcnow().isoformat(),
+#                 "agent_version": "1.0.0",
+#             }
+
+#             logger.info(
+#                 f"ADK workflow completed - Risk: {risk_label}, Score: {risk_score:.1f}"
+#             )
+#             return result
+
+#         except Exception as e:
+#             logger.error(f"ADK workflow failed: {str(e)}")
+#             return self._get_fallback_result(detections)
+
+
+#     # ------------------------------------------------------------
+#     # SUMMARY GENERATION (USING GEMINI v1)
+#     # ------------------------------------------------------------
+#     def _generate_summary(self, detections, risk_score, risk_label):
+#         try:
+#             # Build text prompt
+#             objs = ", ".join(
+#                 f"{o.get('label', 'unknown')} ({o.get('confidence', 0):.0%})"
+#                 for o in detections.get("detected_objects", [])
+#             ) or "No objects detected"
+
+#             scene = detections.get("scene_analysis", {})
+#             risk_factors = ", ".join(detections.get("risk_factors", [])) or "none"
+
+#             prompt = f"""
+# Generate a concise 2–3 sentence driving safety summary.
+
+# Scene Details:
+# - Objects: {objs}
+# - Road Type: {scene.get('road_type', 'unknown')}
+# - Lighting: {scene.get('lighting', 'unknown')}
+# - Weather: {scene.get('weather', 'unknown')}
+# - Traffic: {scene.get('traffic_density', 'unknown')}
+# - Risk Factors: {risk_factors}
+# - Risk Score: {risk_score:.1f}/100
+
+# Start the output with: "Risk level {risk_label}:"
+# """
+
+#             # Use a text-only model (recommended)
+#             text_model = Config.GEMINI_TEXT_MODEL  # e.g., "gemini-2.0-flash"
+
+#             response = safe_generate_content(
+#                 model=text_model,
+#                 contents=[prompt],
+#                 generation_config={
+#                     "temperature": 0.7,
+#                     "max_output_tokens": 150,
+#                 }
+#             )
+
+#             summary = response.text.strip()
+#             logger.info(f"Generated summary: {summary[:80]}...")
+#             return summary
+
+#         except Exception as e:
+#             logger.error(f"Summary generation failed: {str(e)}")
+#             return f"Risk level {risk_label}: Summary unavailable."
+
+
+#     # ------------------------------------------------------------
+#     # GUARDRAILS
+#     # ------------------------------------------------------------
+#     def _apply_guardrails(self, summary: str) -> str:
+#         try:
+#             harmful = ["ignore", "bypass", "disable", "hack", "exploit",
+#                        "private", "secret", "password", "credential"]
+
+#             sanitized = summary
+#             for w in harmful:
+#                 sanitized = sanitized.replace(w, "[redacted]")
+
+#             if len(sanitized) > 500:
+#                 sanitized = sanitized[:497] + "..."
+
+#             if not sanitized.strip():
+#                 sanitized = "Risk assessment completed."
+
+#             return sanitized
+
+#         except Exception:
+#             return "Risk assessment completed."
+
+
+#     # ------------------------------------------------------------
+#     # FALLBACK
+#     # ------------------------------------------------------------
+#     def _get_fallback_result(self, detections: Dict[str, Any]) -> Dict[str, Any]:
+#         return {
+#             "risk_score": 50.0,
+#             "risk_label": "MODERATE",
+#             "summary": "Unable to complete analysis.",
+#             "detections": detections,
+#             "timestamp": datetime.utcnow().isoformat(),
+#             "agent_version": "1.0.0",
+#             "error": "Fallback result due to processing error",
+#         }
+
+
+# # ---------- Singleton ----------
+# _agent = None
+
+# def get_adk_agent() -> ADKAgent:
+#     global _agent
+#     if _agent is None:
+#         _agent = ADKAgent()
+#     return _agent

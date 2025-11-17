@@ -32,6 +32,20 @@
             vertical-align: middle; /* Helps align icons with text */
             line-height: 1; /* Prevents extra line height */
         }
+        
+        /* Highlight for newest analyzed frame */
+        .frame-highlight {
+            background: rgba(66,133,244,0.06);
+            border-left: 3px solid #4285F4;
+            padding-left: 0.5rem;
+        }
+        /* Progress bar */
+        .progress-bar { background: #e6e9eb; height: 8px; border-radius: 8px; position: relative; overflow: hidden; }
+        .progress-fill { background: linear-gradient(90deg,#4285F4,#0f9d58); height: 100%; width: 0%; transition: width 0.1s linear; }
+        .progress-marker { position: absolute; width: 2px; height: 12px; top: -2px; background: rgba(219,68,55,0.9); }
+        .status-badge { display:inline-block; padding:4px 8px; border-radius:999px; font-size:12px; background:#f1f3f4; color:#202124; }
+        .status-badge.streaming { background: #e8f0fe; color: #1a73e8; }
+        .status-badge.error { background: #fdecea; color: #d93025; }
     </style>
 
     <!-- Custom Tailwind configuration from the Google UI Demo -->
@@ -76,14 +90,15 @@
                 <!-- Upload Box -->
                 <div id="uploadBox" class="border-2 border-dashed border-google-gray-medium bg-google-gray-light rounded-lg p-10 text-center cursor-pointer transition-all hover:border-google-blue hover:bg-blue-50 [&.drag-over]:border-google-green [&.drag-over]:bg-green-50">
                     <span class="material-symbols-outlined text-5xl text-google-blue mb-4">upload_file</span>
-                    <div class="text-lg font-medium text-google-text mb-2">Click or drag image here</div>
-                    <div class="text-sm text-google-gray-dark">PNG, JPEG, WebP, GIF up to 20MB</div>
-                    <input type="file" id="fileInput" class="hidden" accept="image/*">
+                    <div class="text-lg font-medium text-google-text mb-2">Click or drag image/video here</div>
+                    <div class="text-sm text-google-gray-dark">PNG, JPEG, WebP, GIF, mp4 up to 20-80MB</div>
+                    <input type="file" id="fileInput" class="hidden" accept="image/*,video/*">
                 </div>
 
                 <!-- Image Preview -->
                 <div class="image-preview text-center" id="preview" style="display: none;">
-                    <img id="previewImg" alt="Preview" class="max-w-full max-h-72 rounded-lg border border-google-gray-medium shadow-sm inline-block">
+                    <img id="previewImg" alt="Preview" class="max-w-full max-h-96 rounded-lg border border-google-gray-medium shadow-sm inline-block" style="display: none;">
+                    <video id="previewVideo" playsinline muted controls class="max-w-full max-h-96 rounded-lg border border-google-gray-medium shadow-sm inline-block" style="display: none;"></video>
                     <div class="preview-name text-sm text-google-gray-dark mt-2" id="previewName"></div>
                 </div>
             </div>
@@ -92,7 +107,7 @@
             <div class="button-group flex flex-col sm:flex-row gap-3">
                 <!-- Primary Action: Filled Button -->
                 <button class="btn-analyze flex-1 bg-google-blue text-white px-6 py-2.5 rounded-full font-medium text-sm hover:bg-blue-700 hover:shadow-md transition-all disabled:opacity-50 disabled:shadow-none disabled:cursor-not-allowed" id="analyzeBtn" disabled>
-                    Analyze Image
+                    Analyze Video
                 </button>
                 <!-- Secondary Action: Text Button -->
                 <button class="btn-clear sm:flex-none text-google-blue px-4 py-2.5 rounded-full font-medium text-sm hover:bg-blue-50 transition-all" id="clearBtn">
@@ -160,68 +175,402 @@
 
         fileInput.addEventListener('change', handleFileSelect);
 
-        function handleFileSelect() {
+        async function handleFileSelect() {
             const file = fileInput.files[0];
             if (!file) return;
-
-            if (!file.type.startsWith('image/')) {
-                showError('Please select a valid image file');
+            // Basic validations
+            if (!(file.type.startsWith('image/') || file.type.startsWith('video/'))) {
+                showError('Please select a valid image or video file');
                 return;
             }
 
-            if (file.size > 20 * 1024 * 1024) {
-                showError('Image is too large (max 20MB)');
+            if (file.size > 200 * 1024 * 1024) {
+                showError('File is too large (max 200MB)');
                 return;
             }
 
             selectedFile = file;
 
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                previewImg.src = e.target.result;
-                previewName.textContent = file.name;
+            // Reset preview
+            previewImg.style.display = 'none';
+            previewVideo.style.display = 'none';
+
+            if (file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    previewImg.src = e.target.result;
+                    previewName.textContent = file.name;
+                    previewDiv.style.display = 'block';
+                    uploadBox.style.display = 'none';
+                    analyzeBtn.disabled = false;
+                    analyzeBtn.textContent = 'Analyze Image';
+                    result.style.display = 'none'; // Hide old results
+                };
+                reader.readAsDataURL(file);
+            } else {
+                // Video preview using object URL
+                // Try to crop to first 5 seconds client-side before rendering
+                const MAX_SECONDS = 5;
+                previewName.textContent = file.name + ' (preparing preview...)';
+                loading.style.display = 'block';
+                try {
+                    const cropped = await cropVideoToDuration(file, MAX_SECONDS);
+                    // Use cropped blob for preview and upload
+                    const url = URL.createObjectURL(cropped);
+                    previewVideo.src = url;
+                    // replace selectedFile with a File created from cropped blob so upload sends trimmed clip
+                    selectedFile = new File([cropped], file.name.replace(/\.[^.]+$/, '') + `-preview.webm`, { type: cropped.type });
+                    previewName.textContent = file.name + ` (preview ${MAX_SECONDS}s)`;
+                } catch (e) {
+                    // If cropping fails, fall back to original file preview
+                    console.warn('Video cropping failed, using full file', e);
+                    const url = URL.createObjectURL(file);
+                    previewVideo.src = url;
+                    previewName.textContent = file.name;
+                } finally {
+                    loading.style.display = 'none';
+                }
+
                 previewDiv.style.display = 'block';
                 uploadBox.style.display = 'none';
                 analyzeBtn.disabled = false;
-                result.style.display = 'none'; // Hide old results
-            };
-            reader.readAsDataURL(file);
+                analyzeBtn.textContent = 'Analyze Video (stream)';
+                result.style.display = 'none';
+            }
+        }
+
+        // Crop video to given duration (seconds) using MediaRecorder and captureStream.
+        // Returns a Blob of the recorded clip (webm) or throws if not supported.
+        function cropVideoToDuration(file, maxSeconds) {
+            return new Promise((resolve, reject) => {
+                if (!('MediaRecorder' in window)) {
+                    return reject(new Error('MediaRecorder not supported'));
+                }
+
+                const url = URL.createObjectURL(file);
+                const tmpVideo = document.createElement('video');
+                tmpVideo.muted = true;
+                tmpVideo.playsInline = true;
+                tmpVideo.src = url;
+                tmpVideo.crossOrigin = 'anonymous';
+
+                const chunks = [];
+                let recorder;
+
+                const cleanup = () => {
+                    try { tmpVideo.pause(); } catch (e) {}
+                    tmpVideo.src = '';
+                    URL.revokeObjectURL(url);
+                };
+
+                tmpVideo.addEventListener('loadedmetadata', async () => {
+                    // start playing and recording
+                    try {
+                        const stream = tmpVideo.captureStream ? tmpVideo.captureStream() : tmpVideo.mozCaptureStream();
+                        if (!stream) return reject(new Error('captureStream not supported'));
+
+                        try {
+                            recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp8' });
+                        } catch (e) {
+                            try {
+                                recorder = new MediaRecorder(stream);
+                            } catch (err) {
+                                return reject(err);
+                            }
+                        }
+
+                        recorder.ondataavailable = (ev) => { if (ev.data && ev.data.size) chunks.push(ev.data); };
+                        recorder.onstop = () => {
+                            const blob = new Blob(chunks, { type: chunks[0]?.type || 'video/webm' });
+                            cleanup();
+                            resolve(blob);
+                        };
+
+                        recorder.start();
+                        // Start playback
+                        await tmpVideo.play();
+
+                        // Stop after maxSeconds or when video ends
+                        const stopTimer = setTimeout(() => {
+                            try { recorder.stop(); } catch (e) { cleanup(); reject(e); }
+                        }, Math.max(1, Math.floor(maxSeconds * 1000)));
+
+                        tmpVideo.addEventListener('ended', () => {
+                            clearTimeout(stopTimer);
+                            try { if (recorder.state !== 'inactive') recorder.stop(); } catch (e) { /* ignore */ }
+                        });
+
+                    } catch (err) {
+                        cleanup();
+                        reject(err);
+                    }
+                });
+
+                tmpVideo.addEventListener('error', (e) => {
+                    cleanup();
+                    reject(new Error('Failed to load video for cropping'));
+                });
+            });
         }
 
         analyzeBtn.addEventListener('click', async () => {
             if (!selectedFile) return;
 
-            const formData = new FormData();
-            formData.append('image', selectedFile);
+                loading.style.display = 'block';
+                result.style.display = 'none';
+                analyzeBtn.disabled = true;
+                clearBtn.disabled = true; // Disable clear during analysis
 
-            loading.style.display = 'block';
-            result.style.display = 'none';
-            analyzeBtn.disabled = true;
-            clearBtn.disabled = true; // Disable clear during analysis
+                try {
+                    if (selectedFile.type.startsWith('image/')) {
+                        const formData = new FormData();
+                        formData.append('image', selectedFile);
 
-            try {
-                const response = await fetch(`${API_BASE}/analyze`, {
+                        const response = await fetch(`${API_BASE}/analyze`, {
+                            method: 'POST',
+                            body: formData
+                        });
+
+                        if (!response.ok) {
+                            const error = await response.json();
+                            throw new Error(error.detail || 'Analysis failed');
+                        }
+
+                        const data = await response.json();
+                        displayResult(data);
+                        loadHistory();
+
+                    } else {
+                        // Video: stream results
+                        await analyzeVideoStream(selectedFile);
+                    }
+
+                } catch (error) {
+                    showError(error.message || String(error));
+                } finally {
+                    loading.style.display = 'none';
+                    analyzeBtn.disabled = false;
+                    clearBtn.disabled = false; // Re-enable clear
+                }
+        });
+
+            async function analyzeVideoStream(file) {
+                // Clear previous results
+                result.innerHTML = '';
+                result.style.display = 'block';
+
+                const fd = new FormData();
+                fd.append('video', file);
+                // request backend to analyze only first 5 seconds for a preview clip
+                const MAX_SECONDS = 5;
+                fd.append('max_seconds', String(MAX_SECONDS));
+
+                const response = await fetch(`${API_BASE}/analyze_video`, {
                     method: 'POST',
-                    body: formData
+                    body: fd
                 });
 
                 if (!response.ok) {
-                    const error = await response.json();
-                    throw new Error(error.detail || 'Analysis failed');
+                    const text = await response.text();
+                    throw new Error(text || 'Video analysis failed');
                 }
 
-                const data = await response.json();
-                displayResult(data);
-                loadHistory();
+                // Arrange playback and analysis side-by-side
+                let playbackContainer = document.getElementById('playbackContainer');
+                if (!playbackContainer) {
+                    playbackContainer = document.createElement('div');
+                    playbackContainer.id = 'playbackContainer';
+                    playbackContainer.className = 'flex gap-4 items-start w-full';
 
-            } catch (error) {
-                showError(error.message);
-            } finally {
-                loading.style.display = 'none';
-                analyzeBtn.disabled = false;
-                clearBtn.disabled = false; // Re-enable clear
+                    // left: video area (wider)
+                    const left = document.createElement('div');
+                    left.id = 'playbackLeft';
+                    left.className = 'w-2/3 relative';
+
+                    // status and progress container
+                    const statusBar = document.createElement('div');
+                    statusBar.id = 'statusBar';
+                    statusBar.className = 'mb-3 flex items-center justify-between';
+                    statusBar.innerHTML = `
+                        <div id="streamStatus" class="status-badge">Idle</div>
+                        <div>
+                            <button id="cancelStreamBtn" class="text-sm text-google-red px-3 py-1 rounded-full bg-red-50 hidden">Cancel</button>
+                        </div>
+                    `;
+                    left.appendChild(statusBar);
+
+                    // progress bar container
+                    const progressWrap = document.createElement('div');
+                    progressWrap.className = 'mb-3';
+                    progressWrap.innerHTML = `<div class="progress-bar" id="progressBar"><div class="progress-fill" id="progressFill"></div></div>`;
+                    left.appendChild(progressWrap);
+                    // ensure previewDiv is visible inside left
+                    left.appendChild(previewDiv);
+
+                    // overlay marker
+                    const marker = document.createElement('div');
+                    marker.id = 'videoMarker';
+                    marker.style.position = 'absolute';
+                    marker.style.top = '0';
+                    marker.style.width = '2px';
+                    marker.style.height = '100%';
+                    marker.style.background = 'rgba(219,68,55,0.9)';
+                    marker.style.transition = 'left 0.15s linear';
+                    marker.style.left = '0%';
+                    marker.style.pointerEvents = 'none';
+                    left.appendChild(marker);
+
+                    // right: analysis area (narrower)
+                    const right = document.createElement('div');
+                    right.id = 'playbackRight';
+                    right.className = 'w-1/3 overflow-auto max-h-96';
+                    // move current result into right
+                    right.appendChild(result);
+
+                    playbackContainer.appendChild(left);
+                    playbackContainer.appendChild(right);
+
+                    // insert playbackContainer into the main content area
+                    const contentArea = document.querySelector('.p-6');
+                    if (contentArea) {
+                        contentArea.appendChild(playbackContainer);
+                    } else if (historySection && historySection.parentNode) {
+                        historySection.parentNode.insertBefore(playbackContainer, historySection);
+                    } else {
+                        document.body.appendChild(playbackContainer);
+                    }
+                }
+
+                // Ensure preview elements are visible
+                previewDiv.style.display = 'block';
+                previewVideo.style.display = 'block';
+
+                // Start playing the preview clip side-by-side while streaming.
+                // Many browsers block autoplay unless the video is muted; ensure muted before play.
+                previewVideo.muted = true;
+                try {
+                    previewVideo.currentTime = 0;
+                    await previewVideo.play();
+                } catch (e) {
+                    // autoplay blocked: show a small play overlay so user can start playback
+                    let overlay = document.getElementById('playOverlay');
+                    if (!overlay) {
+                        overlay = document.createElement('div');
+                        overlay.id = 'playOverlay';
+                        overlay.className = 'absolute inset-0 flex items-center justify-center';
+                        overlay.style.pointerEvents = 'auto';
+                        const btn = document.createElement('button');
+                        btn.className = 'bg-google-blue text-white px-4 py-2 rounded-full';
+                        btn.textContent = 'Play Preview';
+                        btn.onclick = async () => {
+                            try {
+                                previewVideo.muted = false; // unmute if desired
+                                await previewVideo.play();
+                                overlay.remove();
+                            } catch (e) {
+                                console.error('Play failed', e);
+                            }
+                        };
+                        overlay.appendChild(btn);
+                        const left = document.getElementById('playbackLeft');
+                        if (left) left.appendChild(overlay);
+                    }
+                }
+
+                // stop playback after requested seconds
+                const stopPlaybackTimer = setTimeout(() => {
+                    try { previewVideo.pause(); } catch (e) {}
+                }, MAX_SECONDS * 1000 + 200);
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+                let framesContainer = null;
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    buffer += decoder.decode(value, { stream: true });
+                    let parts = buffer.split('\n');
+                    buffer = parts.pop();
+
+                    for (const part of parts) {
+                        if (!part.trim()) continue;
+                        try {
+                            const obj = JSON.parse(part);
+                            if (obj.final) {
+                                // final summary
+                                const footer = document.createElement('div');
+                                footer.className = 'text-xs text-google-gray-dark mt-3';
+                                footer.textContent = `Stream completed: ${obj.frames_sent} frames processed in ${obj.processing_time_ms}ms`;
+                                result.appendChild(footer);
+                                clearTimeout(stopPlaybackTimer);
+                            } else {
+                                // Per-frame analysis
+                                if (!framesContainer) {
+                                    // Create container header
+                                    const header = document.createElement('div');
+                                    header.className = 'bg-white rounded-lg p-5 border border-google-gray-medium mb-3';
+                                    header.innerHTML = `<div class="text-base font-medium mb-2">Live Video Analysis</div>`;
+                                    framesContainer = document.createElement('div');
+                                    framesContainer.id = 'framesList';
+                                    header.appendChild(framesContainer);
+                                    result.appendChild(header);
+                                }
+
+                                const frameDiv = document.createElement('div');
+                                frameDiv.className = 'bg-google-gray-light p-2 rounded-lg text-sm text-google-gray-dark mb-2';
+                                const a = obj.analysis || {};
+                                const score = a.risk_score !== undefined ? a.risk_score.toFixed(1) : 'n/a';
+                                const label = a.risk_label || 'UNKNOWN';
+                                const summary = a.summary || '';
+                                const timeInfo = obj.frame_time_s !== undefined ? ` @ ${obj.frame_time_s}s` : '';
+                                frameDiv.innerHTML = `<strong>Frame ${obj.frame_index}${timeInfo}</strong> — <span class="font-medium">${label}</span> <span class="text-xs text-google-gray-dark">(${score}/100)</span><div class="text-xs mt-1">${summary}</div>`;
+                                frameDiv.id = `frame-${obj.frame_index}`;
+                                framesContainer.insertBefore(frameDiv, framesContainer.firstChild);
+
+                                // highlight this frame entry and remove previous highlight
+                                const prev = framesContainer.querySelector('.frame-highlight');
+                                if (prev) prev.classList.remove('frame-highlight');
+                                frameDiv.classList.add('frame-highlight');
+
+                                // move marker to approximate position over video
+                                const marker = document.getElementById('videoMarker');
+                                if (marker && obj.frame_time_s !== undefined) {
+                                    const pct = Math.min(100, Math.max(0, (obj.frame_time_s / MAX_SECONDS) * 100));
+                                    marker.style.left = pct + '%';
+                                }
+
+                                // Also update a compact top result using latest frame
+                                // Reuse displayResult-like compact view for latest frame
+                                try {
+                                    const latest = obj.analysis || {};
+                                    const compact = {
+                                        risk_score: latest.risk_score || 0,
+                                        risk_label: latest.risk_label || 'UNKNOWN',
+                                        summary: latest.summary || '',
+                                        detections: latest.detections || {},
+                                        processing_time_ms: Math.round((Date.now())/1)
+                                    };
+                                    // Show compact summary at top
+                                    let compactDiv = document.getElementById('videoCompact');
+                                    if (!compactDiv) {
+                                        compactDiv = document.createElement('div');
+                                        compactDiv.id = 'videoCompact';
+                                        compactDiv.className = 'mb-3';
+                                        result.insertBefore(compactDiv, result.firstChild);
+                                    }
+                                    compactDiv.innerHTML = `<div class="bg-white rounded-lg p-4 border border-google-gray-medium"><div class="flex justify-between items-center"><div class="text-base font-medium">Live Summary</div><span class="px-3 py-1 text-sm font-medium rounded-full bg-yellow-100">${compact.risk_label}</span></div><div class="text-3xl font-normal text-google-text mt-2">${compact.risk_score}<span class="text-sm text-google-gray-dark">/100</span></div><div class="mt-3 text-sm text-google-gray-dark">${compact.summary}</div></div>`;
+                                } catch (e) {
+                                    // ignore display errors
+                                }
+                            }
+                        } catch (e) {
+                            console.warn('Failed to parse stream chunk', e, part);
+                        }
+                    }
+                }
             }
-        });
 
         clearBtn.addEventListener('click', () => {
             fileInput.value = '';
@@ -308,6 +657,31 @@
         }
 
         function showError(message) {
+            // Normalize message: if JSON, try to extract useful fields
+            let userMessage = '';
+            try {
+                if (typeof message === 'string' && message.trim().startsWith('{')) {
+                    const obj = JSON.parse(message);
+                    userMessage = obj.detail || obj.error || obj.message || JSON.stringify(obj);
+                } else if (typeof message === 'object' && message !== null) {
+                    userMessage = message.detail || message.error || message.message || JSON.stringify(message);
+                } else {
+                    userMessage = String(message);
+                }
+            } catch (e) {
+                userMessage = String(message);
+            }
+
+            // Friendly guidance for common errors
+            let guidance = '';
+            if (userMessage.toLowerCase().includes('opencv') || userMessage.toLowerCase().includes('libgl')) {
+                guidance = '<div class="text-xs text-google-gray-dark mt-2">Server lacks headless OpenCV. Try redeploying with `opencv-python-headless` or install system lib `libgl1`.</div>';
+            } else if (userMessage.toLowerCase().includes('api key not valid') || userMessage.toLowerCase().includes('api_key_invalid')) {
+                guidance = '<div class="text-xs text-google-gray-dark mt-2">Gemini API key invalid or missing. Set `GEMINI_API_KEY` and restart the server.</div>';
+            } else if (userMessage.toLowerCase().includes('default credentials') || userMessage.toLowerCase().includes('application default credentials')) {
+                guidance = '<div class="text-xs text-google-gray-dark mt-2">Google credentials missing. Run `gcloud auth application-default login` or set `GOOGLE_APPLICATION_CREDENTIALS`.</div>';
+            }
+
             // Use a Material-style error box
             result.innerHTML = `
                 <div class="bg-red-100 border-l-4 border-google-red text-google-red p-4 rounded-lg" role="alert">
@@ -315,7 +689,8 @@
                         <div class="py-1"><span class="material-symbols-outlined mr-3">error</span></div>
                         <div>
                             <p class="font-medium">Analysis Failed</p>
-                            <p class="text-sm">${message}</p>
+                            <p class="text-sm">${userMessage}</p>
+                            ${guidance}
                         </div>
                     </div>
                 </div>
