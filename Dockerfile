@@ -1,24 +1,23 @@
 # Use Python 3.11 slim base image
 FROM python:3.11-slim
 
-# Set working directory to project root (not app)
-WORKDIR /app
+# Set working directory
+WORKDIR /
 
-# Install minimal system dependencies (gcc for some Python packages)
+# Install minimal system dependencies
 RUN apt-get update && apt-get install -y \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements
-COPY app/requirements.txt .
+# Copy entire project
+COPY . /app
+
+# Change to app directory
+WORKDIR /app
 
 # Install Python dependencies
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir -r requirements.txt
-
-# Copy application code to /app/app/
-COPY app/ ./app/
-COPY frontend/ ./frontend/
+    pip install --no-cache-dir -r app/requirements.txt
 
 # Create non-root user for security
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
@@ -27,5 +26,5 @@ USER appuser
 # Expose port
 EXPOSE 8080
 
-# Run application (app.main is now correct with /app as workdir)
+# Run application
 CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
