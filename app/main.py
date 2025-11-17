@@ -278,6 +278,11 @@ async def analyze_video(
 
     # Parameters
     FRAME_INTERVAL_SECONDS = 1.0  # sample one frame per second by default
+    # Default to analyze first 10 seconds if frontend doesn't specify `max_seconds`
+    DEFAULT_MAX_SECONDS = 7.0
+
+    if max_seconds is None:
+        max_seconds = float(DEFAULT_MAX_SECONDS)
 
     async def stream_frames():
         try:
@@ -287,11 +292,12 @@ async def analyze_video(
                 return
 
             fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
-            interval_frames = max(1, int(fps * FRAME_INTERVAL_SECONDS))
+            # Use time-based sampling instead of strict frame index intervals
+            interval_seconds = float(FRAME_INTERVAL_SECONDS)
+            next_sample_time = 0.0
 
             frame_idx = 0
             sent_frames = 0
-
             vision_model = get_vision_model()
             adk_agent = get_adk_agent()
 
@@ -300,14 +306,16 @@ async def analyze_video(
                 if not ret:
                     break
 
-                # compute timestamp (seconds) for this frame
-                frame_time = frame_idx / fps if fps else 0.0
+                # compute timestamp (seconds) for this frame using current capture position
+                pos_ms = cap.get(cv2.CAP_PROP_POS_MSEC) or 0.0
+                frame_time = pos_ms / 1000.0
 
                 # stop early if requested
                 if max_seconds is not None and frame_time > float(max_seconds):
                     break
 
-                if frame_idx % interval_frames == 0:
+                # sample based on time intervals (more reliable for variable frame rates)
+                if frame_time + 1e-6 >= next_sample_time:
                     # encode frame to JPEG bytes
                     success, encoded = cv2.imencode('.jpg', frame)
                     if not success:
@@ -334,6 +342,9 @@ async def analyze_video(
 
                     yield json.dumps(event) + "\n"
                     sent_frames += 1
+
+                    # schedule next sample
+                    next_sample_time += interval_seconds
 
                     # small pause to yield control
                     await asyncio.sleep(0)
