@@ -1,0 +1,25 @@
+steps:
+  # Step 1: Build the Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/drivesight:latest', '.']
+    id: 'build-image'
+
+  # Step 2: Push to Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/drivesight:latest']
+    id: 'push-image'
+
+  # Step 3: Deploy to Cloud Run
+  - name: 'gcr.io/cloud-builders/gke-deploy'
+    args:
+      - run
+      - --filename=.
+      - --image=gcr.io/$PROJECT_ID/drivesight:latest
+      - --location=us-central1
+      - --filename=clouddeploy.yaml
+    id: 'deploy'
+
+images:
+  - 'gcr.io/$PROJECT_ID/drivesight:latest'
+
+timeout: 1800s

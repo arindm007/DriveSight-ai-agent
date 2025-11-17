@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DriveSight - Road Risk Assessment</title>
+    
+    <!-- 1. Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- 2. Google Fonts: Roboto (the standard Google font) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <!-- 3. Google Fonts: Material Symbols (for icons) -->
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+
+    <style>
+        /* Apply the Roboto font as the default */
+        body {
+            font-family: 'Roboto', sans-serif;
+        }
+        
+        /* This is the standard class for using Material Symbols */
+        .material-symbols-outlined {
+            font-variation-settings:
+            'FILL' 0,
+            'wght' 400,
+            'GRAD' 0,
+            'opsz' 24;
+            vertical-align: middle; /* Helps align icons with text */
+            line-height: 1; /* Prevents extra line height */
+        }
+    </style>
+
+    <!-- Custom Tailwind configuration from the Google UI Demo -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // Google's primary brand colors
+                        'google-blue': '#4285F4',
+                        'google-red': '#DB4437',
+                        'google-yellow': '#F4B400',
+                        'google-green': '#0F9D58',
+                        // Standard neutral colors used in Google apps
+                        'google-gray-light': '#F1F3F4', // Light background
+                        'google-gray-medium': '#DADCE0', // Borders
+                        'google-gray-dark': '#5F6368',  // Secondary text
+                        'google-text': '#202124',       // Primary text
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-google-gray-light text-google-text flex items-center justify-center min-h-screen p-4">
+
+    <!-- Main application card -->
+    <div class="bg-white rounded-xl shadow-lg border border-google-gray-medium max-w-2xl w-full overflow-hidden">
+        
+        <!-- Header -->
+        <div class="text-center p-6 border-b border-google-gray-medium">
+            <h1 class="text-3xl font-normal text-google-text flex items-center justify-center">
+                <span class="material-symbols-outlined text-google-blue mr-2 text-3xl">directions_car</span>
+                DriveSight
+            </h1>
+            <p class="text-base text-google-gray-dark mt-1">AI-powered road risk assessment</p>
+        </div>
+
+        <!-- Content -->
+        <div class="p-6">
+            <div class="upload-section mb-6">
+                <!-- Upload Box -->
+                <div id="uploadBox" class="border-2 border-dashed border-google-gray-medium bg-google-gray-light rounded-lg p-10 text-center cursor-pointer transition-all hover:border-google-blue hover:bg-blue-50 [&.drag-over]:border-google-green [&.drag-over]:bg-green-50">
+                    <span class="material-symbols-outlined text-5xl text-google-blue mb-4">upload_file</span>
+                    <div class="text-lg font-medium text-google-text mb-2">Click or drag image here</div>
+                    <div class="text-sm text-google-gray-dark">PNG, JPEG, WebP, GIF up to 20MB</div>
+                    <input type="file" id="fileInput" class="hidden" accept="image/*">
+                </div>
+
+                <!-- Image Preview -->
+                <div class="image-preview text-center" id="preview" style="display: none;">
+                    <img id="previewImg" alt="Preview" class="max-w-full max-h-72 rounded-lg border border-google-gray-medium shadow-sm inline-block">
+                    <div class="preview-name text-sm text-google-gray-dark mt-2" id="previewName"></div>
+                </div>
+            </div>
+
+            <!-- Buttons -->
+            <div class="button-group flex flex-col sm:flex-row gap-3">
+                <!-- Primary Action: Filled Button -->
+                <button class="btn-analyze flex-1 bg-google-blue text-white px-6 py-2.5 rounded-full font-medium text-sm hover:bg-blue-700 hover:shadow-md transition-all disabled:opacity-50 disabled:shadow-none disabled:cursor-not-allowed" id="analyzeBtn" disabled>
+                    Analyze Image
+                </button>
+                <!-- Secondary Action: Text Button -->
+                <button class="btn-clear sm:flex-none text-google-blue px-4 py-2.5 rounded-full font-medium text-sm hover:bg-blue-50 transition-all" id="clearBtn">
+                    Clear
+                </button>
+            </div>
+
+            <!-- Loading Spinner -->
+            <div class="loading text-center p-6 hidden" id="loading">
+                <div class="w-10 h-10 border-4 border-google-gray-light border-t-google-blue rounded-full animate-spin mx-auto mb-4"></div>
+                <p class="text-sm text-google-gray-dark">Analyzing your image...</p>
+            </div>
+
+            <!-- Result Area -->
+            <div class="result hidden mt-6" id="result"></div>
+
+            <!-- History Section -->
+            <div class="history-section hidden mt-6 border-t border-google-gray-medium pt-6" id="historySection">
+                <div class="history-title text-base font-medium text-google-text mb-3 flex items-center">
+                    <span class="material-symbols-outlined text-google-gray-dark mr-2">history</span>
+                    Recent Analyses
+                </div>
+                <div id="historyList" class="space-y-2"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // API_BASE remains the same
+        const API_BASE = window.location.origin;
+        
+        // DOM elements remain the same
+        const uploadBox = document.getElementById('uploadBox');
+        const fileInput = document.getElementById('fileInput');
+        const previewDiv = document.getElementById('preview');
+        const previewImg = document.getElementById('previewImg');
+        const previewName = document.getElementById('previewName');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const loading = document.getElementById('loading');
+        const result = document.getElementById('result');
+        const historySection = document.getElementById('historySection');
+        const historyList = document.getElementById('historyList');
+
+        let selectedFile = null;
+
+        // Drag and drop listeners
+        uploadBox.addEventListener('click', () => fileInput.click());
+        uploadBox.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadBox.classList.add('drag-over'); // Changed from 'active'
+        });
+        uploadBox.addEventListener('dragleave', () => {
+            uploadBox.classList.remove('drag-over'); // Changed from 'active'
+        });
+        uploadBox.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadBox.classList.remove('drag-over'); // Changed from 'active'
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                fileInput.files = files;
+                handleFileSelect();
+            }
+        });
+
+        fileInput.addEventListener('change', handleFileSelect);
+
+        function handleFileSelect() {
+            const file = fileInput.files[0];
+            if (!file) return;
+
+            if (!file.type.startsWith('image/')) {
+                showError('Please select a valid image file');
+                return;
+            }
+
+            if (file.size > 20 * 1024 * 1024) {
+                showError('Image is too large (max 20MB)');
+                return;
+            }
+
+            selectedFile = file;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                previewImg.src = e.target.result;
+                previewName.textContent = file.name;
+                previewDiv.style.display = 'block';
+                uploadBox.style.display = 'none';
+                analyzeBtn.disabled = false;
+                result.style.display = 'none'; // Hide old results
+            };
+            reader.readAsDataURL(file);
+        }
+
+        analyzeBtn.addEventListener('click', async () => {
+            if (!selectedFile) return;
+
+            const formData = new FormData();
+            formData.append('image', selectedFile);
+
+            loading.style.display = 'block';
+            result.style.display = 'none';
+            analyzeBtn.disabled = true;
+            clearBtn.disabled = true; // Disable clear during analysis
+
+            try {
+                const response = await fetch(`${API_BASE}/analyze`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Analysis failed');
+                }
+
+                const data = await response.json();
+                displayResult(data);
+                loadHistory();
+
+            } catch (error) {
+                showError(error.message);
+            } finally {
+                loading.style.display = 'none';
+                analyzeBtn.disabled = false;
+                clearBtn.disabled = false; // Re-enable clear
+            }
+        });
+
+        clearBtn.addEventListener('click', () => {
+            fileInput.value = '';
+            selectedFile = null;
+            previewDiv.style.display = 'none';
+            uploadBox.style.display = 'block';
+            analyzeBtn.disabled = true;
+            result.style.display = 'none';
+        });
+
+        function displayResult(data) {
+            let riskClass, riskColorClass;
+            switch (data.risk_label.toLowerCase()) {
+                case 'high':
+                    riskClass = 'bg-red-100 text-google-red';
+                    riskColorClass = 'text-google-red';
+                    break;
+                case 'moderate':
+                    riskClass = 'bg-yellow-100 text-yellow-700';
+                    riskColorClass = 'text-yellow-700';
+                    break;
+                case 'low':
+                default:
+                    riskClass = 'bg-green-100 text-google-green';
+                    riskColorClass = 'text-google-green';
+            }
+            
+            const cached = data.cached ? '<span class="ml-2 bg-google-gray-medium text-google-gray-dark text-xs font-medium px-2 py-0.5 rounded-full">CACHED</span>' : '';
+
+            const detections = data.detections || {};
+            const objects = detections.detected_objects || [];
+            const scene = detections.scene_analysis || {};
+
+            const objectsHtml = objects.length > 0
+                ? objects.map(obj => `<span class="inline-block bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-medium m-0.5">${obj.label} (${(obj.confidence * 100).toFixed(0)}%)</span>`).join('')
+                : '<span class="text-sm text-google-gray-dark">No objects detected</span>';
+
+            const html = `
+                <div class="bg-white rounded-lg p-5 border border-google-gray-medium">
+                    <div class="flex justify-between items-center mb-3">
+                        <div class="text-base font-medium text-google-text flex items-center">
+                            Analysis Result
+                            ${cached}
+                        </div>
+                        <span class="px-3 py-1 text-sm font-medium rounded-full ${riskClass}">${data.risk_label}</span>
+                    </div>
+                    
+                    <div class="text-5xl font-normal ${riskColorClass} mb-3">${data.risk_score.toFixed(1)}<span class="text-2xl text-google-gray-dark">/100</span></div>
+                    
+                    <div class="summary bg-google-gray-light p-4 rounded-lg border-l-4 border-google-blue text-sm text-google-text leading-relaxed mb-5">
+                        ${data.summary}
+                    </div>
+                    
+                    <div class="details-section mb-5">
+                        <div class="details-title text-sm font-medium text-google-gray-dark uppercase tracking-wider mb-2 flex items-center">
+                            <span class="material-symbols-outlined text-base mr-1.5">visibility</span> Detected Objects
+                        </div>
+                        <div class="details-content bg-google-gray-light p-3 rounded-lg">
+                            ${objectsHtml}
+                        </div>
+                    </div>
+                    
+                    <div class="details-section">
+                        <div class="details-title text-sm font-medium text-google-gray-dark uppercase tracking-wider mb-2 flex items-center">
+                            <span class="material-symbols-outlined text-base mr-1.5">landscape</span> Scene Analysis
+                        </div>
+                        <div class="details-content bg-google-gray-light p-3 rounded-lg text-sm text-google-gray-dark space-y-2">
+                            <div class="flex justify-between"><strong>Road Type:</strong> <span>${scene.road_type || 'Unknown'}</span></div>
+                            <div class="flex justify-between"><strong>Lighting:</strong> <span>${scene.lighting || 'Unknown'}</span></div>
+                            <div class="flex justify-between"><strong>Weather:</strong> <span>${scene.weather || 'Unknown'}</span></div>
+                            <div class="flex justify-between"><strong>Traffic:</strong> <span>${scene.traffic_density || 'Unknown'}</span></div>
+                        </div>
+                    </div>
+                    
+                    <div class="processing-time text-xs text-google-gray-dark text-right mt-4 flex items-center justify-end">
+                        <span class="material-symbols-outlined text-sm mr-1">timer</span>
+                        Processed in ${data.processing_time_ms}ms
+                    </div>
+                </div>
+            `;
+
+            result.innerHTML = html;
+            result.style.display = 'block';
+        }
+
+        function showError(message) {
+            // Use a Material-style error box
+            result.innerHTML = `
+                <div class="bg-red-100 border-l-4 border-google-red text-google-red p-4 rounded-lg" role="alert">
+                    <div class="flex">
+                        <div class="py-1"><span class="material-symbols-outlined mr-3">error</span></div>
+                        <div>
+                            <p class="font-medium">Analysis Failed</p>
+                            <p class="text-sm">${message}</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+            result.style.display = 'block';
+        }
+
+        async function loadHistory() {
+            try {
+                const response = await fetch(`${API_BASE}/history?limit=5`);
+                if (!response.ok) return;
+
+                const data = await response.json();
+                if (data.count === 0) {
+                    historySection.style.display = 'none';
+                    return;
+                }
+
+                let html = '';
+                for (const analysis of data.analyses.slice(0, 5)) {
+                    const time = new Date(analysis.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    let riskColorClass;
+                    switch (analysis.risk_label.toLowerCase()) {
+                        case 'high': riskColorClass = 'text-google-red'; break;
+                        case 'moderate': riskColorClass = 'text-yellow-700'; break;
+                        default: riskColorClass = 'text-google-green';
+                    }
+
+                    html += `
+                        <div class="bg-google-gray-light p-3 rounded-lg text-sm text-google-gray-dark flex justify-between items-center">
+                            <div>
+                                <strong class_="${riskColorClass}">${analysis.risk_label}</strong>
+                                <span class="text-google-text font-medium">(${analysis.risk_score.toFixed(0)})</span>
+                            </div>
+                            <span class="text-xs">${time}</span>
+                        </div>
+                    `;
+                }
+
+                historyList.innerHTML = html;
+                historySection.style.display = 'block';
+
+            } catch (error) {
+                console.error('Failed to load history:', error);
+            }
+        }
+
+        // Load history on page load
+        loadHistory();
+    </script>
+</body>
+</html>
