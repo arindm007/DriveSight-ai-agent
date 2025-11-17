@@ -10,21 +10,34 @@ from PIL import Image
 import io
 from .config import Config
 from .logger import setup_logger
+import os
+
+# Configure API key FIRST, before any model initialization
+gemini_key = os.getenv("GEMINI_API_KEY")
+if not gemini_key:
+    raise ValueError("GEMINI_API_KEY not set")
+
+genai.configure(api_key=gemini_key)
 
 logger = setup_logger(__name__)
 
 class VisionModel:
     """Wrapper for Gemini Vision multimodal API"""
-    
+        
     def __init__(self):
         """Initialize Gemini API client"""
         try:
-            genai.configure()  # Uses GOOGLE_APPLICATION_CREDENTIALS
+            # Always force API key usage (NEVER OAuth in Cloud Run)
+            gemini_key = os.getenv("GEMINI_API_KEY")
+            genai.configure(api_key=gemini_key)
+
             self.model = genai.GenerativeModel(Config.GEMINI_MODEL)
             logger.info(f"Gemini Vision model initialized: {Config.GEMINI_MODEL}")
+
         except Exception as e:
             logger.error(f"Failed to initialize Gemini model: {str(e)}")
             raise
+
 
     def analyze_image_local(self, image_data: bytes) -> Dict[str, Any]:
         """

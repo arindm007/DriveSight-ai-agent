@@ -7,6 +7,15 @@ from datetime import datetime
 import google.generativeai as genai
 from .config import Config
 from .logger import setup_logger
+import os
+
+# Configure API key FIRST
+gemini_key = os.getenv("GEMINI_API_KEY")
+if gemini_key:
+    genai.configure(api_key=gemini_key)
+else:
+    raise ValueError("GEMINI_API_KEY not set")
+
 
 logger = setup_logger(__name__)
 
@@ -15,12 +24,8 @@ class ADKAgent:
     
     def __init__(self):
         """Initialize ADK Agent"""
-        try:
-            genai.configure()
-            logger.info("ADK Agent initialized")
-        except Exception as e:
-            logger.error(f"Failed to initialize ADK Agent: {str(e)}")
-            raise
+        # genai already configured at module import with GEMINI_API_KEY.
+        logger.info("ADK Agent initialized (using configured Gemini API key)")
 
     def compute_risk_score(self, detections: Dict[str, Any]) -> Tuple[float, str]:
         """
@@ -151,39 +156,39 @@ class ADKAgent:
     def _generate_summary(self, detections: Dict[str, Any], risk_score: float, risk_label: str) -> str:
         """
         Generate natural language summary using Gemini
-        
-        Args:
-            detections: Detection results
-            risk_score: Computed risk score
-            risk_label: Risk label
-            
-        Returns:
-            Natural language summary
         """
         try:
-            # Build context prompt
+            # Always force API key config (prevents Cloud Run OAuth fallback)
+            gemini_key = os.getenv("GEMINI_API_KEY")
+            genai.configure(api_key=gemini_key)
+
+            # Build prompt
             objects_text = ", ".join([
                 f"{obj.get('label', 'unknown')} (confidence: {obj.get('confidence', 0):.0%})"
                 for obj in detections.get('detected_objects', [])
             ]) or "No objects detected"
-            
+
             scene = detections.get('scene_analysis', {})
             risk_factors = ", ".join(detections.get('risk_factors', ['none'])) or "none"
-            
+
             prompt = f"""Based on this road scene analysis, generate a concise driving risk summary (2-3 sentences max).
 
-Detection Summary:
-- Objects: {objects_text}
-- Road Type: {scene.get('road_type', 'unknown')}
-- Lighting: {scene.get('lighting', 'unknown')}
-- Weather: {scene.get('weather', 'unknown')}
-- Traffic: {scene.get('traffic_density', 'unknown')}
-- Risk Factors: {risk_factors}
-- Risk Score: {risk_score:.1f}/100 ({risk_label})
+    Detection Summary:
+    - Objects: {objects_text}
+    - Road Type: {scene.get('road_type', 'unknown')}
+    - Lighting: {scene.get('lighting', 'unknown')}
+    - Weather: {scene.get('weather', 'unknown')}
+    - Traffic: {scene.get('traffic_density', 'unknown')}
+    - Risk Factors: {risk_factors}
+    - Risk Score: {risk_score:.1f}/100 ({risk_label})
 
-Generate a natural, actionable summary for the driver. Start with "Risk level {risk_label}:" and be specific about hazards."""
+    Generate a natural, actionable summary. Start with "Risk level {risk_label}:"."""
 
-            model = genai.GenerativeModel('gemini-2.0-flash-exp')
+            # Force usage of the API key for summary generation
+            gemini_key = os.getenv("GEMINI_API_KEY")
+            genai.configure(api_key=gemini_key)
+
+            model = genai.GenerativeModel(Config.GEMINI_MODEL)
             response = model.generate_content(
                 prompt,
                 generation_config={
@@ -191,11 +196,11 @@ Generate a natural, actionable summary for the driver. Start with "Risk level {r
                     "max_output_tokens": 150,
                 }
             )
-            
+
             summary = response.text.strip()
             logger.info(f"Generated summary: {summary[:80]}...")
             return summary
-            
+
         except Exception as e:
             logger.error(f"Summary generation failed: {str(e)}")
             return f"Risk level {risk_label}: Unable to generate detailed analysis. Please review road conditions manually."

@@ -71,15 +71,15 @@ curl http://localhost:8080/health
 
 ```bash
 # 1. Build Docker image
-docker build -t gcr.io/YOUR_PROJECT_ID/drivesight:latest .
+docker build -t gcr.io/drivesight-ai-agent/drivesight:latest .
 
 # 2. Test container locally
 docker run \
   -p 8080:8080 \
+  --env-file .env \
   -e GOOGLE_APPLICATION_CREDENTIALS=/app/key.json \
   -v "$(pwd)/key.json:/app/key.json:ro" \
-  gcr.io/YOUR_PROJECT_ID/drivesight:latest
-
+  gcr.io/drivesight-ai-agent/drivesight:latest
 # 3. Test from browser
 # http://localhost:8080/frontend/index.html
 
@@ -103,13 +103,23 @@ gcloud run deploy drivesight \
 
 # OPTION B: From pre-built image
 # (After pushing image to gcr.io)
+
+# First, source your .env to get all vars
+set -a
+source .env
+set +a
+
+# Then deploy with all vars
 gcloud run deploy drivesight \
-  --image gcr.io/YOUR_PROJECT_ID/drivesight:latest \
+  --image gcr.io/drivesight-ai-agent/drivesight:latest \
   --region europe-west1 \
   --allow-unauthenticated \
   --memory 4Gi \
   --cpu 2 \
+  --set-env-vars GCP_PROJECT_ID=$GCP_PROJECT_ID,GCS_BUCKET=$GCS_BUCKET,FIRESTORE_COLLECTION=$FIRESTORE_COLLECTION,LOG_LEVEL=$LOG_LEVEL \
   --quiet
+
+# Service URL: https://drivesight-799545102588.europe-west1.run.app
 
 # 3. Get service URL
 SERVICE_URL=$(gcloud run services describe drivesight \
@@ -285,3 +295,18 @@ CACHE_TTL=3600
 ---
 
 **You're ready! Start with `bash setup.sh YOUR_PROJECT_ID` 🚀**
+
+
+
+
+<!-- ------------------------------
+
+gcloud run deploy drivesight \
+  --image gcr.io/drivesight-ai-agent/drivesight:latest \
+  --region europe-west1 \
+  --allow-unauthenticated \
+  --service-account drivesight-sa@drivesight-ai-agent.iam.gserviceaccount.com \
+  --set-env-vars GEMINI_API_KEY="ACTUAL-API_KEY",GCP_PROJECT_ID=$GCP_PROJECT_ID,GCS_BUCKET=$GCS_BUCKET,FIRESTORE_COLLECTION=$FIRESTORE_COLLECTION,LOG_LEVEL=$LOG_LEVEL \
+  --quiet
+
+ -->

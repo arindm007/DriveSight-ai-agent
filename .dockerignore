@@ -1,0 +1,44 @@
+# Ignore node modules and package manager logs
+node_modules
+npm-debug.log*
+yarn-error.log*
+
+# Build / output directories
+dist
+build
+out
+coverage
+*.map
+
+# Environment files and secrets
+.env
+.env.* 
+*.pem
+*.key
+*.secret
+*.crt
+
+# Git / VCS
+.git
+.gitignore
+
+# Docker files (if you don't want them sent in the build context)
+Dockerfile
+Dockerfile.*
+docker-compose*
+.dockerignore
+
+# Editor / OS files
+.vscode/
+.idea/
+*.suo
+*.user
+*.log
+.DS_Store
+Thumbs.db
+
+# Temp / system files
+tmp/
+temp/
+*.tmp
+*.swp
