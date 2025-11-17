@@ -6,7 +6,7 @@ set -e
 
 # Configuration
 PROJECT_ID="${1:-your-project-id}"
-REGION="us-central1"
+REGION="europe-west1"
 BUCKET_NAME="${PROJECT_ID}-drivesight-images"
 FIRESTORE_COLLECTION="analyses"
 SA_NAME="drivesight-sa"
@@ -52,7 +52,7 @@ echo "🔥 Setting up Firestore..."
 if gcloud firestore databases list --format="value(name)" | grep -q "default"; then
     echo "   ✓ Firestore database already exists"
 else
-    gcloud firestore databases create --region "$REGION" --type=firestore-native
+    gcloud firestore databases create --location "$REGION" --type=firestore-native
     echo "   ✓ Created Firestore database"
 fi
 
