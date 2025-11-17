@@ -5,7 +5,11 @@ FastAPI backend with Gemini Vision and Firestore integration
 import uuid
 from typing import Optional
 from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
+import tempfile
+import io
+import json
+import asyncio
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 import time
@@ -230,6 +234,125 @@ async def get_risk_statistics():
     except Exception as e:
         logger.error(f"Failed to compute statistics: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to compute statistics")
+
+
+@app.post("/analyze_video", tags=["Analysis"])
+async def analyze_video(
+    video: UploadFile = File(...),
+    background_tasks: BackgroundTasks = BackgroundTasks()
+):
+    """
+    Analyze uploaded video by extracting frames and streaming per-frame analysis.
+
+    This endpoint streams newline-delimited JSON objects for each processed frame.
+    The frontend can consume the response stream to display live insights.
+    """
+    start_time = time.time()
+
+    # Lazy import OpenCV to avoid import-time binary compatibility failures
+    try:
+        import importlib
+        cv2 = importlib.import_module('cv2')
+    except Exception as e:
+        logger.error(f"OpenCV import failed: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "OpenCV (cv2) import failed. This often happens when opencv-python was built against a different NumPy ABI. "
+                "Try installing a NumPy < 2 (e.g. `pip install 'numpy<2'`) or reinstalling opencv-python compatible with your NumPy version. "
+                f"Underlying error: {str(e)}"
+            )
+        )
+
+    if not video.content_type.startswith("video"):
+        raise HTTPException(status_code=400, detail="Invalid video format")
+
+    # Save uploaded video to a temporary file
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
+    video_bytes = await video.read()
+    tmp.write(video_bytes)
+    tmp.flush()
+    tmp.close()
+    tmp_path = tmp.name
+
+    # Parameters
+    FRAME_INTERVAL_SECONDS = 1.0  # sample one frame per second by default
+
+    async def stream_frames():
+        try:
+            cap = cv2.VideoCapture(tmp_path)
+            if not cap.isOpened():
+                yield json.dumps({"error": "failed_to_open_video"}) + "\n"
+                return
+
+            fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
+            interval_frames = max(1, int(fps * FRAME_INTERVAL_SECONDS))
+
+            frame_idx = 0
+            sent_frames = 0
+
+            vision_model = get_vision_model()
+            adk_agent = get_adk_agent()
+
+            while True:
+                ret, frame = cap.read()
+                if not ret:
+                    break
+
+                if frame_idx % interval_frames == 0:
+                    # encode frame to JPEG bytes
+                    success, encoded = cv2.imencode('.jpg', frame)
+                    if not success:
+                        # skip this frame
+                        frame_idx += 1
+                        continue
+
+                    frame_bytes = encoded.tobytes()
+
+                    # Run vision analysis in a thread to avoid blocking event loop
+                    try:
+                        detections = await asyncio.to_thread(vision_model.analyze_image_local, frame_bytes)
+                        adk_result = await asyncio.to_thread(adk_agent.run_adk_workflow, detections)
+                    except Exception as e:
+                        adk_result = {'error': str(e)}
+
+                    event = {
+                        'frame_index': sent_frames,
+                        'timestamp': time.time(),
+                        'filename': video.filename,
+                        'analysis': adk_result
+                    }
+
+                    yield json.dumps(event) + "\n"
+                    sent_frames += 1
+
+                    # small pause to yield control
+                    await asyncio.sleep(0)
+
+                frame_idx += 1
+
+            cap.release()
+
+            # final event: summary
+            total_time_ms = round((time.time() - start_time) * 1000, 2)
+            yield json.dumps({"final": True, "frames_sent": sent_frames, "processing_time_ms": total_time_ms}) + "\n"
+
+            # Optionally, store last analysis in background (not implemented heavily)
+            try:
+                # Basic background storage: take last adk_result if present
+                if sent_frames > 0 and 'adk_result' in locals():
+                    toolbox = get_toolbox()
+                    background_tasks.add_task(_store_analysis, adk_result, b'', str(uuid.uuid4()))
+            except Exception:
+                pass
+
+        finally:
+            try:
+                os.remove(tmp_path)
+            except Exception:
+                pass
+
+    return StreamingResponse(stream_frames(), media_type="text/event-stream")
 
 
 async def _store_analysis(
