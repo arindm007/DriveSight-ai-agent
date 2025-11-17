@@ -15,7 +15,7 @@ steps:
       - run
       - --filename=.
       - --image=gcr.io/$PROJECT_ID/drivesight:latest
-      - --location=us-central1
+      - --location=europe-west1
       - --filename=clouddeploy.yaml
     id: 'deploy'
 
