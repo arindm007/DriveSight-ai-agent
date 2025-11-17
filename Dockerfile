@@ -4,17 +4,17 @@ FROM python:3.11-slim
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies
+# Install minimal system dependencies (gcc for some Python packages)
 RUN apt-get update && apt-get install -y \
     gcc \
-    libpython3.11-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements
 COPY app/requirements.txt .
 
 # Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY app/ .
