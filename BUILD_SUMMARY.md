@@ -184,7 +184,7 @@ bash setup.sh YOUR_PROJECT_ID
 ```bash
 gcloud run deploy drivesight \
   --source . \
-  --region us-central1 \
+  --region europe-west1 \
   --allow-unauthenticated \
   --memory 4Gi --cpu 2
 ```

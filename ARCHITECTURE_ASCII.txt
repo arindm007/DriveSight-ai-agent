@@ -16,7 +16,7 @@
           ┌──────────────────────▼──────────────────────┐
           │                                             │
           │         CLOUD RUN SERVICE (FRONTEND)        │
-          │         Region: us-central1                 │
+          │         Region: europe-west1                 │
           │         Memory: 4Gi | CPU: 2 vCPU           │
           │         Timeout: 300s | Auto-scale: 0-10    │
           │                                             │
@@ -41,7 +41,7 @@
           ┌───────────────────▼────────────────────┐
           │                                        │
           │    CLOUD RUN SERVICE (API BACKEND)     │
-          │    Region: us-central1                 │
+          │    Region: europe-west1                 │
           │    Memory: 4Gi | CPU: 2 vCPU           │
           │    Timeout: 300s | Auto-scale: 0-10    │
           │                                        │
@@ -230,7 +230,7 @@
 │ CLOUD RUN CONFIGURATION                                                     │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │ Service Name: drivesight                                                    │
-│ Region: us-central1                                                         │
+│ Region: europe-west1                                                         │
 │ Memory: 4 GiB                                                               │
 │ CPU: 2 vCPU                                                                 │
 │ Timeout: 300 seconds                                                        │
@@ -241,7 +241,7 @@
 │ Port: 8080                                                                  │
 │ Health Check: GET /health                                                   │
 │ Startup Probe: 40s                                                          │
-│ Environment: us-central1 (for low latency)                                  │
+│ Environment: europe-west1 (for low latency)                                  │
 └─────────────────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -249,7 +249,7 @@
 ├─────────────────────────────────────────────────────────────────────────────┤
 │ Database ID: (default)                                                      │
 │ Mode: Native                                                                │
-│ Location: us-central1                                                       │
+│ Location: europe-west1                                                       │
 │ Collection: analyses                                                        │
 │                                                                             │
 │ Document Structure:                                                         │
@@ -274,7 +274,7 @@
 │ CLOUD STORAGE (GCS)                                                         │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │ Bucket Name: {project-id}-drivesight-images                                 │
-│ Region: us-central1                                                         │
+│ Region: europe-west1                                                         │
 │ Storage Class: STANDARD                                                     │
 │ Versioning: Disabled                                                        │
 │ Path Structure: images/{image_id}.jpg                                       │
@@ -373,7 +373,7 @@
 │                                                                             │
 │ 3. Deploy to Cloud Run                                                      │
 │    └─ Service: drivesight                                                   │
-│    └─ Region: us-central1                                                   │
+│    └─ Region: europe-west1                                                   │
 │    └─ Configuration: (as above)                                             │
 │                                                                             │
 │ Build Time: ~2-3 minutes                                                    │
@@ -455,7 +455,7 @@ SCALING BEHAVIOR:
 
 Cloud Run: $2-5 (100 req/day, varies with compute time)
 Firestore: $3-5 (100K reads, $1/M reads above free tier)
-Cloud Storage: $0.02 (1GB storage in us-central1)
+Cloud Storage: $0.02 (1GB storage in europe-west1)
 Gemini APIs: $5-10 (100K requests, depends on model)
 ────────────────────────────────
 TOTAL: ~$10-25/month (prototype)

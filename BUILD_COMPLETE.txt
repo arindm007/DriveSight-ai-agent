@@ -53,7 +53,7 @@ cd e:\BNB\code\drivesight
 bash setup.sh YOUR_GCP_PROJECT_ID
 
 # 3. Deploy to Cloud Run
-gcloud run deploy drivesight --source . --region us-central1
+gcloud run deploy drivesight --source . --region europe-west1
 ```
 
 That's it! Your app will be deployed and accessible.

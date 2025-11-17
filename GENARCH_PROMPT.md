@@ -31,7 +31,7 @@ ARCHITECTURE COMPONENTS:
      - Framework: FastAPI with Uvicorn
      - Endpoints: /analyze, /history, /stats, /health, /docs
      - Configuration: 4Gi memory, 2 vCPU, 300s timeout, auto-scaling 0-10 instances
-     - Region: us-central1
+     - Region: europe-west1
      - Allow unauthenticated access (prototype phase)
 
 3. APPLICATION LAYER (Cloud Run):
@@ -76,7 +76,7 @@ ARCHITECTURE COMPONENTS:
    
    a) FIRESTORE DATABASE:
       - Type: NoSQL document database (Native mode)
-      - Region: us-central1
+      - Region: europe-west1
       - Collection: analyses
       - Document fields: image_id, gcs_uri, filename, risk_score, risk_label, summary, detections, scene_analysis, visibility_issues, risk_factors, created_at, doc_id
       - Queries: Historical retrieval, aggregation queries
@@ -85,7 +85,7 @@ ARCHITECTURE COMPONENTS:
    
    b) CLOUD STORAGE (GCS):
       - Bucket name: {project-id}-drivesight-images
-      - Region: us-central1
+      - Region: europe-west1
       - Path structure: images/{image_id}.jpg
       - Content type: image/jpeg
       - Lifecycle policies: Archive after 90 days (optional)
@@ -236,7 +236,7 @@ When adding components to GenArch, use these names for best results:
 └──────────────────────┬──────────────────────────────────┘
                        │ HTTPS/REST
           ┌────────────▼────────────┐
-          │    Cloud Run Service    │ (us-central1)
+          │    Cloud Run Service    │ (europe-west1)
           │   (4Gi, 2vCPU, 0-10)    │
           │                         │
           │  ┌──────────────────┐   │
@@ -382,9 +382,9 @@ Cloud Build
 
 When GenArch generates the diagram, ensure these are visible:
 
-- **Cloud Run**: 4Gi memory, 2 vCPU, 300s timeout, us-central1, auto-scale 0-10
-- **Firestore**: Native mode, us-central1, 50K read quota included
-- **GCS**: Regional (us-central1), lifecycle policies optional
+- **Cloud Run**: 4Gi memory, 2 vCPU, 300s timeout, europe-west1, auto-scale 0-10
+- **Firestore**: Native mode, europe-west1, 50K read quota included
+- **GCS**: Regional (europe-west1), lifecycle policies optional
 - **APIs**: Gemini 2.0 Flash (Vision + Text)
 - **Cache**: In-memory, 1-hour TTL, SHA-256 hashing
 
@@ -401,7 +401,7 @@ After GenArch generates the diagram, verify it shows:
 - [ ] GCS bucket for image storage
 - [ ] Service account connections to all services
 - [ ] Data flow arrows between components
-- [ ] Region information (us-central1)
+- [ ] Region information (europe-west1)
 - [ ] Auto-scaling configuration (0-10)
 - [ ] Monitoring/Logging connection
 - [ ] CI/CD pipeline (Cloud Build)

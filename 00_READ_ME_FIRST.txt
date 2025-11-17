@@ -138,10 +138,10 @@ Local Development:
   python -m uvicorn app.main:app --reload --port 8080
 
 Deploy to Cloud Run:
-  gcloud run deploy drivesight --source . --region us-central1
+  gcloud run deploy drivesight --source . --region europe-west1
 
 Monitor:
-  gcloud run logs read drivesight --region us-central1 --follow
+  gcloud run logs read drivesight --region europe-west1 --follow
 
 Test:
   curl http://localhost:8080/health
@@ -188,7 +188,7 @@ GET /docs
 Cloud Run
 ├── Purpose: Serverless compute container
 ├── Configuration: 4Gi memory, 2 vCPU, 300s timeout
-├── Region: us-central1
+├── Region: europe-west1
 └── Status: Deployed
 
 Firestore
