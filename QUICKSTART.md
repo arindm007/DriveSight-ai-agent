@@ -94,7 +94,7 @@ docker run \
 # OPTION A: Fastest (recommended for marathon)
 gcloud run deploy drivesight \
   --source . \
-  --region us-central1 \
+  --region europe-west1 \
   --allow-unauthenticated \
   --memory 4Gi \
   --cpu 2 \
@@ -105,7 +105,7 @@ gcloud run deploy drivesight \
 # (After pushing image to gcr.io)
 gcloud run deploy drivesight \
   --image gcr.io/YOUR_PROJECT_ID/drivesight:latest \
-  --region us-central1 \
+  --region europe-west1 \
   --allow-unauthenticated \
   --memory 4Gi \
   --cpu 2 \
@@ -113,7 +113,7 @@ gcloud run deploy drivesight \
 
 # 3. Get service URL
 SERVICE_URL=$(gcloud run services describe drivesight \
-  --region us-central1 --format='value(status.url)')
+  --region europe-west1 --format='value(status.url)')
 echo "Deployed at: $SERVICE_URL"
 
 # 4. Test deployed service
@@ -140,7 +140,7 @@ curl $SERVICE_URL/health
 5. Open Firestore console to show stored data:
    gcloud firestore databases list
 6. Show Cloud Run metrics:
-   gcloud run services describe drivesight --region us-central1
+   gcloud run services describe drivesight --region europe-west1
 ```
 
 ---

@@ -141,7 +141,7 @@ python -m uvicorn app.main:app --reload --port 8080
 # Option A: Using gcloud (recommended for testing)
 gcloud run deploy drivesight \
     --source . \
-    --region us-central1 \
+    --region europe-west1 \
     --allow-unauthenticated \
     --memory 4Gi \
     --cpu 2 \
@@ -152,7 +152,7 @@ docker build -t gcr.io/YOUR_PROJECT_ID/drivesight:latest .
 docker push gcr.io/YOUR_PROJECT_ID/drivesight:latest
 gcloud run deploy drivesight \
     --image gcr.io/YOUR_PROJECT_ID/drivesight:latest \
-    --region us-central1 \
+    --region europe-west1 \
     --allow-unauthenticated \
     --memory 4Gi \
     --cpu 2
@@ -408,7 +408,7 @@ All operations are logged with structured format:
 
 **View Cloud Run logs:**
 ```bash
-gcloud run logs read drivesight --region us-central1 --limit 50
+gcloud run logs read drivesight --region europe-west1 --limit 50
 ```
 
 ---
@@ -446,13 +446,13 @@ gcloud firestore databases describe
 ### 5. Cloud Run Monitoring
 ```bash
 # View deployment
-gcloud run services describe drivesight --region us-central1
+gcloud run services describe drivesight --region europe-west1
 
 # Monitor metrics
-gcloud run metrics describe drivesight --region us-central1
+gcloud run metrics describe drivesight --region europe-west1
 
 # View logs
-gcloud run logs read drivesight --region us-central1 --tail
+gcloud run logs read drivesight --region europe-west1 --tail
 ```
 
 ---

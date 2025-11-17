@@ -55,22 +55,22 @@ bash setup.sh YOUR_PROJECT_ID
 # Deploy to Cloud Run
 gcloud run deploy drivesight \
   --source . \
-  --region us-central1 \
+  --region europe-west1 \
   --allow-unauthenticated \
   --memory 4Gi --cpu 2 --timeout 300
 
 # Get service URL
-gcloud run services describe drivesight --region us-central1
+gcloud run services describe drivesight --region europe-west1
 gcloud run services describe drivesight \
-  --region us-central1 --format='value(status.url)'
+  --region europe-west1 --format='value(status.url)'
 
 # View logs
-gcloud run logs read drivesight --region us-central1
-gcloud run logs read drivesight --region us-central1 --follow
-gcloud run logs read drivesight --region us-central1 --limit 100
+gcloud run logs read drivesight --region europe-west1
+gcloud run logs read drivesight --region europe-west1 --follow
+gcloud run logs read drivesight --region europe-west1 --limit 100
 
 # Monitor service
-gcloud run services describe drivesight --region us-central1
+gcloud run services describe drivesight --region europe-west1
 ```
 
 ---
@@ -202,13 +202,13 @@ curl http://localhost:8080/openapi.json
 
 ```bash
 # View metrics
-gcloud run metrics describe drivesight --region us-central1
+gcloud run metrics describe drivesight --region europe-west1
 
 # List revisions
-gcloud run revisions list --service drivesight --region us-central1
+gcloud run revisions list --service drivesight --region europe-west1
 
 # Traffic distribution
-gcloud run services describe drivesight --region us-central1 \
+gcloud run services describe drivesight --region europe-west1 \
   --format='value(status.traffic[].revisionName)'
 
 # Set billing alert
@@ -290,7 +290,7 @@ gcloud run logs read drivesight --limit 1000 > logs.txt
 
 ```bash
 # Faster deploy (uses Cloud Build)
-gcloud run deploy drivesight --source . --region us-central1
+gcloud run deploy drivesight --source . --region europe-west1
 
 # Deploy without waiting
 gcloud run deploy drivesight --source . --no-wait

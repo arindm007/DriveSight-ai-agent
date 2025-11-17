@@ -120,7 +120,7 @@ docker push gcr.io/YOUR_PROJECT_ID/drivesight:v1.0.0
 # Deploy directly from source
 gcloud run deploy drivesight \
   --source . \
-  --region us-central1 \
+  --region europe-west1 \
   --allow-unauthenticated \
   --memory 4Gi \
   --cpu 2 \
@@ -130,7 +130,7 @@ gcloud run deploy drivesight \
 
 # After deployment
 SERVICE_URL=$(gcloud run services describe drivesight \
-  --region us-central1 --format='value(status.url)')
+  --region europe-west1 --format='value(status.url)')
 echo "Service deployed at: $SERVICE_URL"
 ```
 
@@ -140,7 +140,7 @@ echo "Service deployed at: $SERVICE_URL"
 # Deploy existing image
 gcloud run deploy drivesight \
   --image gcr.io/YOUR_PROJECT_ID/drivesight:latest \
-  --region us-central1 \
+  --region europe-west1 \
   --allow-unauthenticated \
   --memory 4Gi \
   --cpu 2
@@ -152,7 +152,7 @@ gcloud run deploy drivesight \
 # Automatic build and deploy
 gcloud run deploy drivesight \
   --source . \
-  --region us-central1 \
+  --region europe-west1 \
   --build-service-account drivesight-sa@YOUR_PROJECT_ID.iam.gserviceaccount.com
 
 # Or use cloudbuild.yaml
@@ -168,7 +168,7 @@ gcloud builds submit --config=cloudbuild.yaml
 | **Timeout** | 300s | 5 minutes for vision + analysis |
 | **Min Instances** | 0 | Scale to zero for cost (will cold start) |
 | **Max Instances** | 10 | Prevent runaway costs |
-| **Region** | us-central1 | Closest to US (change as needed) |
+| **Region** | europe-west1 | Closest to US (change as needed) |
 
 ---
 
@@ -199,7 +199,7 @@ Set on Cloud Run service:
 
 ```bash
 gcloud run services update drivesight \
-  --region us-central1 \
+  --region europe-west1 \
   --set-env-vars "
     GCP_PROJECT_ID=YOUR_PROJECT_ID,
     GCS_BUCKET=your-drivesight-images,
@@ -233,17 +233,17 @@ gcloud run services update drivesight \
 
 ```bash
 # View recent logs
-gcloud run logs read drivesight --region us-central1 --limit 50
+gcloud run logs read drivesight --region europe-west1 --limit 50
 
 # Follow logs in real-time
-gcloud run logs read drivesight --region us-central1 --follow
+gcloud run logs read drivesight --region europe-west1 --follow
 
 # Filter by severity
-gcloud run logs read drivesight --region us-central1 \
+gcloud run logs read drivesight --region europe-west1 \
   --filter='severity >= ERROR'
 
 # Search for specific text
-gcloud run logs read drivesight --region us-central1 \
+gcloud run logs read drivesight --region europe-west1 \
   --filter='textPayload =~ "error.*analysis"'
 ```
 
@@ -251,7 +251,7 @@ gcloud run logs read drivesight --region us-central1 \
 
 ```bash
 # View service details
-gcloud run services describe drivesight --region us-central1
+gcloud run services describe drivesight --region europe-west1
 
 # Get request statistics
 gcloud monitoring time-series list --filter='resource.type="cloud_run_revision"'
@@ -264,7 +264,7 @@ gcloud monitoring time-series list --filter='resource.type="cloud_run_revision"'
 
 ```bash
 # View database statistics
-gcloud firestore databases describe --location us-central1
+gcloud firestore databases describe --location europe-west1
 
 # Query read/write statistics
 gcloud logging read 'resource.type="cloud_firestore"' --limit 10
@@ -393,10 +393,10 @@ gcloud firestore import gs://YOUR_BUCKET/backups/20250115
 # Rollback to previous revision
 gcloud run deploy drivesight \
   --image gcr.io/YOUR_PROJECT_ID/drivesight:v0.9.0 \
-  --region us-central1
+  --region europe-west1
 
 # Or using revisions
-gcloud run revisions list --service drivesight --region us-central1
+gcloud run revisions list --service drivesight --region europe-west1
 gcloud run services update-traffic drivesight \
   --to-revisions drivesight-00001=100
 ```

@@ -166,7 +166,7 @@ python -m uvicorn app.main:app --reload --port 8080
 ```bash
 gcloud run deploy drivesight \
   --source . \
-  --region us-central1 \
+  --region europe-west1 \
   --allow-unauthenticated \
   --memory 4Gi \
   --cpu 2 \
@@ -190,10 +190,10 @@ python -m uvicorn app.main:app --reload --port 8080
 bash setup.sh YOUR_PROJECT_ID
 
 # Deploy to Cloud Run
-gcloud run deploy drivesight --source . --region us-central1
+gcloud run deploy drivesight --source . --region europe-west1
 
 # View logs
-gcloud run logs read drivesight --region us-central1 --follow
+gcloud run logs read drivesight --region europe-west1 --follow
 
 # Test API
 curl http://localhost:8080/health
