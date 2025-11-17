@@ -5,9 +5,11 @@ FastAPI backend with Gemini Vision and Firestore integration
 import uuid
 from typing import Optional
 from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 import time
+import os
 
 from .config import Config
 from .logger import setup_logger
@@ -34,6 +36,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Serve static frontend files
+frontend_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend")
+if os.path.exists(frontend_path):
+    app.mount("/frontend", StaticFiles(directory=frontend_path), name="frontend")
 
 # Validate configuration on startup
 @app.on_event("startup")
