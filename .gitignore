@@ -3,6 +3,12 @@ __pycache__/
 *.py[codz]
 *$py.class
 
+.dockerignore
+enabled-services.txt
+iam.json
+key.json
+
+
 # C extensions
 *.so
 
