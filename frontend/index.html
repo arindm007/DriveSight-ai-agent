@@ -42,7 +42,32 @@
         /* Progress bar */
         .progress-bar { background: #e6e9eb; height: 8px; border-radius: 8px; position: relative; overflow: hidden; }
         .progress-fill { background: linear-gradient(90deg,#4285F4,#0f9d58); height: 100%; width: 0%; transition: width 0.1s linear; }
-        .progress-marker { position: absolute; width: 2px; height: 12px; top: -2px; background: rgba(219,68,55,0.9); }
+        /* YouTube-style marker: circular dot with small downward triangle */
+        .progress-marker-yt {
+            position: absolute;
+            top: -6px;
+            transform: translateX(-50%);
+            width: 10px;
+            height: 10px;
+            background: #DB4437;
+            border-radius: 50%;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+            transition: left 0.15s linear;
+            pointer-events: none;
+            z-index: 10;
+        }
+        .progress-marker-yt::after {
+            content: '';
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            top: 100%;
+            width: 8px;
+            height: 6px;
+            background: #DB4437;
+            clip-path: polygon(50% 0, 0 100%, 100% 100%);
+            filter: drop-shadow(0 1px 1px rgba(0,0,0,0.12));
+        }
         .status-badge { display:inline-block; padding:4px 8px; border-radius:999px; font-size:12px; background:#f1f3f4; color:#202124; }
         .status-badge.streaming { background: #e8f0fe; color: #1a73e8; }
         .status-badge.error { background: #fdecea; color: #d93025; }
@@ -109,6 +134,10 @@
                 <button class="btn-analyze flex-1 bg-google-blue text-white px-6 py-2.5 rounded-full font-medium text-sm hover:bg-blue-700 hover:shadow-md transition-all disabled:opacity-50 disabled:shadow-none disabled:cursor-not-allowed" id="analyzeBtn" disabled>
                     Analyze Video
                 </button>
+                <div class="flex items-center gap-2 pl-2">
+                    <input type="checkbox" id="syncToggle" checked />
+                    <label for="syncToggle" class="text-sm text-google-gray-dark">Sync video to analysis</label>
+                </div>
                 <!-- Secondary Action: Text Button -->
                 <button class="btn-clear sm:flex-none text-google-blue px-4 py-2.5 rounded-full font-medium text-sm hover:bg-blue-50 transition-all" id="clearBtn">
                     Clear
@@ -209,8 +238,8 @@
                 reader.readAsDataURL(file);
             } else {
                 // Video preview using object URL
-                // Try to crop to first 5 seconds client-side before rendering
-                const MAX_SECONDS = 5;
+                // Try to crop to first 10 seconds client-side before rendering
+                const MAX_SECONDS = 7;
                 previewName.textContent = file.name + ' (preparing preview...)';
                 loading.style.display = 'block';
                 try {
@@ -361,9 +390,27 @@
 
                 const fd = new FormData();
                 fd.append('video', file);
-                // request backend to analyze only first 5 seconds for a preview clip
-                const MAX_SECONDS = 5;
-                fd.append('max_seconds', String(MAX_SECONDS));
+                // request backend to analyze only the clip duration (use actual preview duration if available)
+                const DEFAULT_MAX_SECONDS = 10;
+
+                // Wait for metadata so we know the exact preview duration
+                async function waitForMeta(v) {
+                    if (!v) return DEFAULT_MAX_SECONDS;
+                    if (!isNaN(v.duration) && v.duration && v.duration !== Infinity) return v.duration;
+                    return new Promise((resolve) => {
+                        const onLoaded = () => {
+                            v.removeEventListener('loadedmetadata', onLoaded);
+                            resolve(v.duration || DEFAULT_MAX_SECONDS);
+                        };
+                        v.addEventListener('loadedmetadata', onLoaded);
+                        // safety timeout
+                        setTimeout(() => resolve(DEFAULT_MAX_SECONDS), 2000);
+                    });
+                }
+
+                const clipDuration = await waitForMeta(previewVideo) || DEFAULT_MAX_SECONDS;
+                const requestedSeconds = Math.min(DEFAULT_MAX_SECONDS, clipDuration);
+                fd.append('max_seconds', String(requestedSeconds));
 
                 const response = await fetch(`${API_BASE}/analyze_video`, {
                     method: 'POST',
@@ -407,18 +454,18 @@
                     // ensure previewDiv is visible inside left
                     left.appendChild(previewDiv);
 
-                    // overlay marker
+                    // overlay marker (YouTube-style)
                     const marker = document.createElement('div');
                     marker.id = 'videoMarker';
-                    marker.style.position = 'absolute';
-                    marker.style.top = '0';
-                    marker.style.width = '2px';
-                    marker.style.height = '100%';
-                    marker.style.background = 'rgba(219,68,55,0.9)';
-                    marker.style.transition = 'left 0.15s linear';
+                    marker.className = 'progress-marker-yt';
                     marker.style.left = '0%';
-                    marker.style.pointerEvents = 'none';
-                    left.appendChild(marker);
+                    // Append marker into the progress bar element so it sits above the track
+                    const progressBarEl = progressWrap.querySelector('#progressBar') || progressWrap.querySelector('.progress-bar');
+                    if (progressBarEl) {
+                        progressBarEl.appendChild(marker);
+                    } else {
+                        left.appendChild(marker);
+                    }
 
                     // right: analysis area (narrower)
                     const right = document.createElement('div');
@@ -444,6 +491,9 @@
                 // Ensure preview elements are visible
                 previewDiv.style.display = 'block';
                 previewVideo.style.display = 'block';
+
+                // Read sync mode: if enabled, we'll drive video playback to match incoming analysis times
+                const syncMode = document.getElementById('syncToggle') ? document.getElementById('syncToggle').checked : true;
 
                 // Start playing the preview clip side-by-side while streaming.
                 // Many browsers block autoplay unless the video is muted; ensure muted before play.
@@ -477,10 +527,11 @@
                     }
                 }
 
-                // stop playback after requested seconds
+                // stop playback after actual clip duration (requestedSeconds from earlier)
+                const clipDurationMs = (requestedSeconds || DEFAULT_MAX_SECONDS) * 1000;
                 const stopPlaybackTimer = setTimeout(() => {
                     try { previewVideo.pause(); } catch (e) {}
-                }, MAX_SECONDS * 1000 + 200);
+                }, clipDurationMs + 200);
 
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
@@ -537,8 +588,22 @@
                                 // move marker to approximate position over video
                                 const marker = document.getElementById('videoMarker');
                                 if (marker && obj.frame_time_s !== undefined) {
-                                    const pct = Math.min(100, Math.max(0, (obj.frame_time_s / MAX_SECONDS) * 100));
+                                    const denom = (typeof requestedSeconds === 'number' && requestedSeconds > 0) ? requestedSeconds : (previewVideo.duration || DEFAULT_MAX_SECONDS);
+                                    const pct = Math.min(100, Math.max(0, (obj.frame_time_s / denom) * 100));
                                     marker.style.left = pct + '%';
+                                }
+
+                                // If syncMode is enabled, seek video to the analysis time (throttle small seeks)
+                                if (syncMode && obj.frame_time_s !== undefined) {
+                                    try {
+                                        const target = Math.max(0, Math.min(previewVideo.duration || requestedSeconds || DEFAULT_MAX_SECONDS, obj.frame_time_s));
+                                        // only seek if difference is noticeable to avoid jitter
+                                        if (Math.abs((previewVideo.currentTime || 0) - target) > 0.15) {
+                                            previewVideo.currentTime = target;
+                                        }
+                                    } catch (e) {
+                                        console.warn('Sync seek failed', e);
+                                    }
                                 }
 
                                 // Also update a compact top result using latest frame
